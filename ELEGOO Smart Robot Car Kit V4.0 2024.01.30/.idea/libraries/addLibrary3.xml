@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="addLibrary3">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/03 Tutorial &amp; Code/08 SmartRobotCarV4.0_DIY and Program on APP/SmartRobotCarV4.0_V1_20220303/addLibrary/NewPing.zip!/" />
+      <root url="jar://$PROJECT_DIR$/03 Tutorial &amp; Code/08 SmartRobotCarV4.0_DIY and Program on APP/SmartRobotCarV4.0_V1_20220303/addLibrary/IRremote.zip!/" />
+      <root url="jar://$PROJECT_DIR$/03 Tutorial &amp; Code/08 SmartRobotCarV4.0_DIY and Program on APP/SmartRobotCarV4.0_V1_20220303/addLibrary/FastLED-master.zip!/" />
+      <root url="jar://$PROJECT_DIR$/03 Tutorial &amp; Code/08 SmartRobotCarV4.0_DIY and Program on APP/SmartRobotCarV4.0_V1_20220303/addLibrary/pitches.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

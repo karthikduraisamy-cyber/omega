@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="addLibrary2">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/02 Manual &amp; Main Code &amp; APP/02 Main Program   (Arduino UNO)/TB6612 &amp; QMI8658C/SmartRobotCarV4.0_V2_20220322/addLibrary/IRremote.zip!/" />
+      <root url="jar://$PROJECT_DIR$/02 Manual &amp; Main Code &amp; APP/02 Main Program   (Arduino UNO)/TB6612 &amp; QMI8658C/SmartRobotCarV4.0_V2_20220322/addLibrary/NewPing.zip!/" />
+      <root url="jar://$PROJECT_DIR$/02 Manual &amp; Main Code &amp; APP/02 Main Program   (Arduino UNO)/TB6612 &amp; QMI8658C/SmartRobotCarV4.0_V2_20220322/addLibrary/pitches.zip!/" />
+      <root url="jar://$PROJECT_DIR$/02 Manual &amp; Main Code &amp; APP/02 Main Program   (Arduino UNO)/TB6612 &amp; QMI8658C/SmartRobotCarV4.0_V2_20220322/addLibrary/FastLED-master.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
