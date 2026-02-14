@@ -71,8 +71,8 @@ public:
   uint8_t Rocker_temp;
 
 public:
-  uint16_t TrackingDetection_S = 0;    // Black tape gives LOW values
-  uint16_t TrackingDetection_E = 450;  // Increased threshold for yellow sheet + black tape
+  uint16_t TrackingDetection_S = 0;    // Lower bound for "on black" (black = low with ITR20001)
+  uint16_t TrackingDetection_E = 550;  // Upper bound for black line (0-550 = on line; white typically 600+)
   uint16_t TrackingDetection_V = 900;  // Ground detection - only triggers if ALL sensors > 900 (truly lifted)
 
 public:
