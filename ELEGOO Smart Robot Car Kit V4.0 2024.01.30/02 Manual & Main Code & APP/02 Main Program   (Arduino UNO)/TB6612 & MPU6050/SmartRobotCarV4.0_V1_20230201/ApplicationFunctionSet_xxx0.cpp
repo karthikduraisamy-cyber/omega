@@ -399,16 +399,27 @@ void ApplicationFunctionSet::ApplicationFunctionSet_RGB(void)
   FastLED.show();
 }
 
-/*Rocker control mode*/
+/*Rocker / Omni / Drift control - direction input drives motion; LCD shows active mode.
+  Rocker_mode: original behavior unchanged (Forward/Backward/Left/Right as-is).
+  Omni_mode: Left/Right mapped to StrafeLeft/StrafeRight. Drift_mode: Left/Right to DriftLeft/DriftRight.*/
 void ApplicationFunctionSet::ApplicationFunctionSet_Rocker(void)
 {
-  if (Application_SmartRobotCarxxx0.Functional_Mode == Rocker_mode)
-  {
-    ApplicationFunctionSet_SmartRobotCarMotionControl(Application_SmartRobotCarxxx0.Motion_Control /*direction*/, Rocker_CarSpeed /*speed*/);
+  SmartRobotCarFunctionalModel m = Application_SmartRobotCarxxx0.Functional_Mode;
+  if (m != Rocker_mode && m != Omni_mode && m != Drift_mode) return;
+
+  SmartRobotCarMotionControl dir = Application_SmartRobotCarxxx0.Motion_Control;
+  if (m == Omni_mode) {
+    if (dir == Left) dir = StrafeLeft;
+    else if (dir == Right) dir = StrafeRight;
+  } else if (m == Drift_mode) {
+    if (dir == Left) dir = DriftLeft;
+    else if (dir == Right) dir = DriftRight;
   }
+  /* Rocker_mode: dir unchanged (Forward/Backward/Left/Right) - same as before */
+  ApplicationFunctionSet_SmartRobotCarMotionControl(dir, Rocker_CarSpeed);
 }
 
-/*Line tracking mode - Based on original ELEGOO tracking demo*/
+/*Line tracking mode - Tracks black line (ITR20001: black = low ADC, white = high ADC)*/
 void ApplicationFunctionSet::ApplicationFunctionSet_Tracking(void)
 {
   static boolean first_is = true;
@@ -422,10 +433,22 @@ void ApplicationFunctionSet::ApplicationFunctionSet_Tracking(void)
       first_is = false;
     }
 
-    // Read fresh sensor values directly (like original ELEGOO demo)
-    float getAnaloguexxx_L = AppITR20001.DeviceDriverSet_ITR20001_getAnaloguexxx_L();
-    float getAnaloguexxx_M = AppITR20001.DeviceDriverSet_ITR20001_getAnaloguexxx_M();
-    float getAnaloguexxx_R = AppITR20001.DeviceDriverSet_ITR20001_getAnaloguexxx_R();
+    /* Stop when car is lifted (all sensors read very high) */
+    if (Car_LeaveTheGround == false)
+    {
+      ApplicationFunctionSet_SmartRobotCarMotionControl(stop_it, 0);
+      return;
+    }
+
+    // Read fresh sensor values (L/M/R = left, middle, right from car's perspective)
+    int getAnaloguexxx_L = AppITR20001.DeviceDriverSet_ITR20001_getAnaloguexxx_L();
+    int getAnaloguexxx_M = AppITR20001.DeviceDriverSet_ITR20001_getAnaloguexxx_M();
+    int getAnaloguexxx_R = AppITR20001.DeviceDriverSet_ITR20001_getAnaloguexxx_R();
+
+    // "On black" = value in [S, E] (standard: black gives low reading, so 0..E)
+    boolean onBlack_L = inRange(getAnaloguexxx_L, TrackingDetection_S, TrackingDetection_E);
+    boolean onBlack_M = inRange(getAnaloguexxx_M, TrackingDetection_S, TrackingDetection_E);
+    boolean onBlack_R = inRange(getAnaloguexxx_R, TrackingDetection_S, TrackingDetection_E);
 
 #if _Test_print
     static unsigned long print_time = 0;
@@ -433,67 +456,61 @@ void ApplicationFunctionSet::ApplicationFunctionSet_Tracking(void)
     {
       print_time = millis();
       Serial.print("L=");
-      Serial.print((int)getAnaloguexxx_L);
+      Serial.print(getAnaloguexxx_L);
       Serial.print(" M=");
-      Serial.print((int)getAnaloguexxx_M);
+      Serial.print(getAnaloguexxx_M);
       Serial.print(" R=");
-      Serial.print((int)getAnaloguexxx_R);
+      Serial.print(getAnaloguexxx_R);
       Serial.print(" [");
       Serial.print(TrackingDetection_S);
       Serial.print("-");
       Serial.print(TrackingDetection_E);
-      Serial.print("] Det:");
-      Serial.print(inRange(getAnaloguexxx_L, TrackingDetection_S, TrackingDetection_E) ? "L" : "-");
-      Serial.print(inRange(getAnaloguexxx_M, TrackingDetection_S, TrackingDetection_E) ? "M" : "-");
-      Serial.println(inRange(getAnaloguexxx_R, TrackingDetection_S, TrackingDetection_E) ? "R" : "-");
+      Serial.print("] ");
+      Serial.print(onBlack_L ? "L" : "-");
+      Serial.print(onBlack_M ? "M" : "-");
+      Serial.println(onBlack_R ? "R" : "-");
     }
 #endif
 
-    // Check middle sensor first (on line = move forward)
-    if (inRange(getAnaloguexxx_M, TrackingDetection_S, TrackingDetection_E))
+    /* Priority: middle on line -> forward; else one side on line -> steer toward line; else blind search */
+    if (onBlack_M)
     {
-      /*Achieve straight and uniform speed movement*/
       ApplicationFunctionSet_SmartRobotCarMotionControl(Forward, 100);
       timestamp = true;
     }
-    else if (inRange(getAnaloguexxx_R, TrackingDetection_S, TrackingDetection_E))
+    else if (onBlack_R && !onBlack_L)
     {
-      /*Turn right*/
       ApplicationFunctionSet_SmartRobotCarMotionControl(Right, 100);
       timestamp = true;
     }
-    else if (inRange(getAnaloguexxx_L, TrackingDetection_S, TrackingDetection_E))
+    else if (onBlack_L && !onBlack_R)
     {
-      /*Turn left*/
       ApplicationFunctionSet_SmartRobotCarMotionControl(Left, 100);
       timestamp = true;
     }
-    else //The car is not on the black line. Execute Blind scan
+    else if (onBlack_L && onBlack_R)
     {
-      if (timestamp == true) //acquire timestamp
+      /* Both sides on black: line under car, go forward */
+      ApplicationFunctionSet_SmartRobotCarMotionControl(Forward, 100);
+      timestamp = true;
+    }
+    else
+    {
+      /* No sensor on black - lost line, execute blind search */
+      if (timestamp == true)
       {
         timestamp = false;
         MotorRL_time = millis();
       }
       unsigned long elapsed = millis() - MotorRL_time;
-      /*Blind Detection - continuous search pattern*/
       if (elapsed < 300)
-      {
         ApplicationFunctionSet_SmartRobotCarMotionControl(Right, 80);
-      }
       else if (elapsed < 900)
-      {
         ApplicationFunctionSet_SmartRobotCarMotionControl(Left, 80);
-      }
       else if (elapsed < 1200)
-      {
         ApplicationFunctionSet_SmartRobotCarMotionControl(Right, 80);
-      }
       else
-      {
-        // Reset and try again
         MotorRL_time = millis();
-      }
     }
   }
   else
@@ -896,19 +913,19 @@ void ApplicationFunctionSet::ApplicationFunctionSet_Standby(void)
   }
 }
 
-/*LCD Display Update*/
+/*LCD Display Update - all user modes (0-6) displayed and updated when mode changes*/
 void ApplicationFunctionSet::ApplicationFunctionSet_LCD(void)
 {
-  // Map functional mode to LCD mode (0=Standby, 1=Tracking, 2=Obstacle, 3=Follow, 4=Rocker, 5=Omni, 6=Drift)
   uint8_t lcdMode = 0;
   switch (Application_SmartRobotCarxxx0.Functional_Mode) {
-    case TraceBased_mode: lcdMode = 1; break;
+    case Standby_mode:           lcdMode = 0; break;
+    case TraceBased_mode:        lcdMode = 1; break;
     case ObstacleAvoidance_mode: lcdMode = 2; break;
-    case Follow_mode: lcdMode = 3; break;
-    case Rocker_mode: lcdMode = 4; break;
-    case Omni_mode: lcdMode = 5; break;
-    case Drift_mode: lcdMode = 6; break;
-    default: lcdMode = 0; break;
+    case Follow_mode:            lcdMode = 3; break;
+    case Rocker_mode:            lcdMode = 4; break;
+    case Omni_mode:              lcdMode = 5; break;
+    case Drift_mode:             lcdMode = 6; break;
+    default:                     lcdMode = 0; break;  // CMD_* and others show Standby
   }
   AppLCD.DeviceDriverSet_LCD_SetMode(lcdMode);
   AppLCD.DeviceDriverSet_LCD_Update();
@@ -1106,11 +1123,14 @@ void ApplicationFunctionSet::ApplicationFunctionSet_IRrecv(void)
 
   if (!IRrecv_en) return;
 
-  // Handle direction controls (buttons 1-4)
+  // Handle direction controls (buttons 1-4) - keep current mode if already Rocker/Omni/Drift
   if (IRrecv_button >= 1 && IRrecv_button <= 4) {
     static const SmartRobotCarMotionControl dirs[] = {Forward, Backward, Left, Right};
     Application_SmartRobotCarxxx0.Motion_Control = dirs[IRrecv_button - 1];
-    Application_SmartRobotCarxxx0.Functional_Mode = Rocker_mode;
+    if (Application_SmartRobotCarxxx0.Functional_Mode != Rocker_mode &&
+        Application_SmartRobotCarxxx0.Functional_Mode != Omni_mode &&
+        Application_SmartRobotCarxxx0.Functional_Mode != Drift_mode)
+      Application_SmartRobotCarxxx0.Functional_Mode = Rocker_mode;
     if (millis() - AppIRrecv.IR_PreMillis > 300) {
       IRrecv_en = false;
       Application_SmartRobotCarxxx0.Functional_Mode = Standby_mode;
@@ -1210,11 +1230,18 @@ void ApplicationFunctionSet::ApplicationFunctionSet_SerialPortDataAnalysis(void)
   case 23: break;
   case 100: Application_SmartRobotCarxxx0.Functional_Mode = CMD_ClearAllFunctions_Standby_mode; break;
   case 110: Application_SmartRobotCarxxx0.Functional_Mode = CMD_ClearAllFunctions_Programming_mode; break;
-  case 101: { // Mode switch
+  case 101: { // Mode switch: 0=Standby, 1=Track, 2=Obstacle, 3=Follow, 4=Rocker, 5=Omni, 6=Drift
     uint8_t mode = getJsonInt(buf, "D1");
-    if (mode == 1) Application_SmartRobotCarxxx0.Functional_Mode = TraceBased_mode;
-    else if (mode == 2) Application_SmartRobotCarxxx0.Functional_Mode = ObstacleAvoidance_mode;
-    else if (mode == 3) Application_SmartRobotCarxxx0.Functional_Mode = Follow_mode;
+    switch (mode) {
+      case 0: Application_SmartRobotCarxxx0.Functional_Mode = Standby_mode; break;
+      case 1: Application_SmartRobotCarxxx0.Functional_Mode = TraceBased_mode; break;
+      case 2: Application_SmartRobotCarxxx0.Functional_Mode = ObstacleAvoidance_mode; break;
+      case 3: Application_SmartRobotCarxxx0.Functional_Mode = Follow_mode; break;
+      case 4: Application_SmartRobotCarxxx0.Functional_Mode = Rocker_mode; break;
+      case 5: Application_SmartRobotCarxxx0.Functional_Mode = Omni_mode; break;
+      case 6: Application_SmartRobotCarxxx0.Functional_Mode = Drift_mode; break;
+      default: break;
+    }
     break;
   }
   case 105: { // Brightness
