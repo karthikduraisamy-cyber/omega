@@ -387,9 +387,9 @@ static const char PROGMEM lcd_scroll[] = " VIKRAM AYAAN SIDDHARTH ";
 
 // Mode display strings in PROGMEM
 static const char PROGMEM str_omega[] = "PROJECT OMEGA";
-static const char PROGMEM str_track[] = "LINE TRACKING";
+static const char PROGMEM str_track[] = "LANE TRACKING";
 static const char PROGMEM str_obst[] = "OBSTACLE DETECT";
-static const char PROGMEM str_follow[] = "FOLLOW";
+static const char PROGMEM str_follow[] = "FOLLOW MODE";
 static const char PROGMEM str_rocker[] = "ROCKER";
 static const char PROGMEM str_omni[] = "OMNI-DIRECTION";
 static const char PROGMEM str_drift[] = "DRIFT MODE";
@@ -470,6 +470,12 @@ void DeviceDriverSet_LCD::LCD_DisplayModeText(uint8_t mode)
       lcd.setCursor(0, 1);
       lcd.print(F("Slide & Drift!"));
       break;
+    default:  // Unknown mode - ensure something is always shown
+      lcd.print(F("MODE "));
+      lcd.print(mode);
+      lcd.setCursor(0, 1);
+      lcd.print(F("Active"));
+      break;
   }
 }
 
@@ -510,6 +516,7 @@ void DeviceDriverSet_LCD::DeviceDriverSet_LCD_Update(void)
 
 void DeviceDriverSet_LCD::DeviceDriverSet_LCD_SetMode(uint8_t mode)
 {
+  if (mode > 6) mode = 0;  // Clamp to valid display modes
   if (mode == currentMode && !obstacleAlert) return;
   currentMode = mode;
   obstacleAlert = false;
